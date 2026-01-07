@@ -1,0 +1,4 @@
+name: one-chassis
+build:
+  cmake: .
+  kconfig: zephyr/Kconfig

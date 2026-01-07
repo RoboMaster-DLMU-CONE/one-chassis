@@ -1,0 +1,13 @@
+config ONE_CHASSIS
+    bool "one-chassis node for OneFramework"
+    depends on ONE_FRAMEWORK
+    help
+      Enable one-chassis node.
+
+if ONE_CHASSIS
+
+module = ONE_CHASSIS
+module-str = ONE_CHASSIS
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # ONE_CHASSIS

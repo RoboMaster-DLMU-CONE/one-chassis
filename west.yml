@@ -1,0 +1,34 @@
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+    - name: robomaster-dlmu
+      url-base: https://github.com/RoboMaster-DLMU-CONE
+    - name: origin
+      url-base: https://github.com/RoboMaster-DLMU-CONE
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: main
+      import:
+        name-allowlist:
+          - cmsis
+          - cmsis_6
+          - hal_stm32
+
+    - name: one-framework
+      remote: robomaster-dlmu
+      revision: main
+      path: modules/lib/one-framework
+      import: true
+
+
+    - name: one-chassis
+      remote: origin
+      repo-path: one-chassis
+      path: modules/lib/nodes/one-chassis
+      revision: main
+
+  self:
+    path: one-chassis

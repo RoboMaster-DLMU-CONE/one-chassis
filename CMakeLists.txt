@@ -1,0 +1,6 @@
+if(CONFIG_ONE_CHASSIS)
+    zephyr_library()
+    zephyr_library_sources(src/OneChassisNode.cpp)
+    zephyr_include_directories(include)
+    zephyr_library_link_libraries(one_framework)
+endif()
