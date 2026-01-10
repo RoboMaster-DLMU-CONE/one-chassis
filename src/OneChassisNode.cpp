@@ -1,11 +1,6 @@
 #include <OneChassisData.hpp>
 #include <OneChassisNode.hpp>
-#include <OneMotor/Motor/DJI/DjiMotor.hpp>
-#include <one/PID/PidParams.hpp>
-#include <one/PID/PidConfig.hpp>
-#include <one/PID/PidChain.hpp>
-#include <OF/lib/ControllerHub/ControllerHub.hpp>
-#include <OF/lib/algo/Mecanum.hpp>
+
 
 #include "OF/lib/HubManager/HubManager.hpp"
 
@@ -22,45 +17,13 @@
  * 我觉得全局函数是对的，应该为ControllerHub和ImuHub增加方便的全局函数调用。
  *
  * 4. ControllerHub应该加入某种虚拟化机制，把不同的遥控器值映射到某个区间，并提供float百分比之类的转换函数
- * 也许后者就够了？
+ * 也许后者就够了？ （已解决）
+ *
+ * 5. OneMotor Zephyr 的CanDriver
  */
 
-using one::pid::PidParams;
-using one::pid::PidConfig;
-using one::pid::PidChain;
-using OneMotor::Motor::DJI::M3508;
-using OneMotor::Motor::DJI::makeM3508;
-using OneMotor::Can::CanDriver;
-using OneMotor::Motor::DJI::PIDFeatures;
+LOG_MODULE_REGISTER(OneChassisNode, CONFIG_ONE_CHASSIS_LOG_LEVEL);
 
-using enum ControllerHub::Channel;
-
-static constexpr PidParams<> ANG_DEFAULT_PARAMS{
-    .Kp = 0.8,
-    .Ki = 0.05,
-    .Kd = 0.1,
-    .MaxOutput = 8000,
-    .Deadband = 10,
-    .IntegralLimit = 100,
-};
-
-static constexpr PidConfig<one::pid::Positional, float, PIDFeatures> g_pid_conf = {ANG_DEFAULT_PARAMS};
-
-static PidChain g_chain(g_pid_conf);
-
-static constexpr OF::Algo::Mecanum::Config g_m_conf{
-    1 * m,
-    2 * m,
-    3 * m
-};
-
-static constexpr OF::Algo::Mecanum::Solver g_solver(g_m_conf);
-
-
-std::unique_ptr<M3508<1, decltype(g_chain)>> m_fl;
-std::unique_ptr<M3508<2, decltype(g_chain)>> m_fr;
-std::unique_ptr<M3508<3, decltype(g_chain)>> m_bl;
-std::unique_ptr<M3508<4, decltype(g_chain)>> m_br;
 
 // Register Topic for data communication
 ONE_TOPIC_REGISTER(OneChassisData, topic_one_chassis, "one_chassis_data");
@@ -68,35 +31,61 @@ ONE_TOPIC_REGISTER(OneChassisData, topic_one_chassis, "one_chassis_data");
 
 bool OneChassisNode::init()
 {
-    auto can_driver = CanDriver(config.can_dev);
-    m_fl = std::make_unique<M3508<1, decltype(g_chain)>>(can_driver, g_chain);
-    m_fr = std::make_unique<M3508<2, decltype(g_chain)>>(can_driver, g_chain);
-    m_bl = std::make_unique<M3508<3, decltype(g_chain)>>(can_driver, g_chain);
-    m_br = std::make_unique<M3508<4, decltype(g_chain)>>(can_driver, g_chain);
+    LOG_INF("init chassis");
+    if (config.can_dev == nullptr) return false;
+    m_driver = std::make_unique<CanDriver>(config.can_dev);
+    m_fl = std::make_unique<M3508<2, decltype(g_chain)>>(*m_driver, g_chain);
+    m_fr = std::make_unique<M3508<1, decltype(g_chain)>>(*m_driver, g_chain);
+    m_bl = std::make_unique<M3508<3, decltype(g_chain)>>(*m_driver, g_chain);
+    m_br = std::make_unique<M3508<4, decltype(g_chain)>>(*m_driver, g_chain);
+    (void)m_fl->setAngRef(0 * rad / s);
+    (void)m_fr->setAngRef(0 * rad / s);
+    (void)m_bl->setAngRef(0 * rad / s);
+    (void)m_br->setAngRef(0 * rad / s);
+    (void)m_fl->enable();
+    (void)m_fr->enable();
+    (void)m_bl->enable();
+    (void)m_br->enable();
     return true;
 }
 
 void OneChassisNode::run()
 {
-    const auto* hub = getHub<ControllerHub>();
+    LOG_INF("running chassis");
     while (true)
     {
-        auto state = hub->getData();
-        const auto leftX = state[LEFT_X];
-        const auto leftY = state[LEFT_Y];
-        const auto rightX = state[RIGHT_X];
-        const auto rightY = state[RIGHT_Y];
+        k_sleep(K_MSEC(10));
+
+        auto state = ControllerHub::getData();
         const auto swL = state[SW_L];
         const auto swR = state[SW_R];
+        const auto leftY = state.percent(LEFT_Y); // 前后
+        const auto leftX = state.percent(LEFT_X); // 左右
+        const auto rightX = state.percent(RIGHT_X); // 旋转
 
-        auto [fl_v, fr_v, bl_v, br_v] = g_solver.inverse({});
+
+        if (swL == 1 || swL == 0) // UP or lost
+        {
+            continue; // 急停
+        }
+
+
+        auto [fl_v, fr_v, bl_v, br_v] = g_solver.inverse({
+            leftY * 3.5f * m / s,
+            -leftX * 3.5f * m / s,
+            -rightX * 2.0f * rad / s,
+        });
+        topic_one_chassis.write({
+            fl_v.numerical_value_in(rad / s), fr_v.numerical_value_in(rad / s), bl_v.numerical_value_in(rad / s),
+            br_v.numerical_value_in(rad / s)
+        });
 
         (void)m_fl->setAngRef(fl_v);
-        (void)m_fr->setAngRef(fr_v);
+        (void)m_fr->setAngRef(-fr_v);
         (void)m_bl->setAngRef(bl_v);
-        (void)m_br->setAngRef(br_v);
+        (void)m_br->setAngRef(-br_v);
     }
 }
 
 // Register the Node with OneFramework
-ONE_NODE_REGISTER(OneChassisNode);
+ONE_NODE_REGISTER (OneChassisNode);
