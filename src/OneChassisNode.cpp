@@ -2,8 +2,15 @@
 #include <OneChassisNode.hpp>
 
 
-#include "OF/lib/HubManager/HubManager.hpp"
+#include <OF/lib/HubManager/HubManager.hpp>
+#include <OF/lib/ImuHub/ImuHub.hpp>
+#include <OF/lib/NotifyHub/Notify.hpp>
 
+#include <numbers>
+
+#include <ems_parser.hpp>
+
+#include "OF/lib/NotifyHub/NotifyHub.hpp"
 
 /* TODO:
  *   1. 目前的电机基类不够优雅，CRTP导致必须要有模板参数，基本无法创建一个通用的类。
@@ -26,6 +33,27 @@ LOG_MODULE_REGISTER(OneChassisNode, CONFIG_ONE_CHASSIS_LOG_LEVEL);
 // Register Topic for data communication
 ONE_TOPIC_REGISTER(OneChassisData, topic_one_chassis, "one_chassis_data");
 
+using namespace ems::literals;
+constexpr auto melody =
+    R"((200)
+        2s`,,1s`,7,,1s`,2s`-,3`-2s`,1s`,,,
+        2s`,,1s`,7,,1s`,2s`-,3`-2s`,1s`,,,
+        2s`,,1s`,7,,1s`,2s`-,3`-2s`,1s`,,,
+        2s`,,1s`,7,,1s`,2s`-,3`-2s`,1s`,,7-1s`-
+        2s`,2s`,1s`,3`,2s`,1s`,1s`,1s`,7,3`,2s`,1s`,
+        1s`,,7-1s`-2s`,,,,,,7,4s`,7`,
+        6s`,,7`,6s`,,7`,6s`-5s`-4s`,,4s`,1s`,3`,
+        3`,2s`,2s`,2s`,,,3`,2s`,1s`,2s`,,4s`,
+        7,,,0
+)"_ems;
+
+static constexpr PidParams<> YAW_DEFAULT_PARAMS{
+    .Kp = 3,
+    .Ki = 0,
+    .Kd = 0.1
+};
+
+static PidController m_yaw_pid(YAW_DEFAULT_PARAMS);
 
 bool OneChassisNode::init()
 {
@@ -44,19 +72,27 @@ bool OneChassisNode::init()
     (void)m_fr->enable();
     (void)m_bl->enable();
     (void)m_br->enable();
+    m_is_yaw_initialized = false;
     return true;
 }
 
 void OneChassisNode::run()
 {
+    constexpr led_color c_normal = COLOR_HEX("#2ec4b6");
+    constexpr led_color c_warning = COLOR_HEX("#f95738");
     LOG_INF("running chassis");
     while (true)
     {
         k_sleep(K_MSEC(10));
-
         auto state = getControllerData();
         if (!state || state.value()[SW_L] == 1)
         {
+            if (!m_warning_status_toggled)
+            {
+                NotifyHub::setLEDStatus("chassis", {c_warning, LEDMode::Breathing, 1, 300});
+                m_warning_status_toggled = true;
+                m_normal_status_toggled = false;
+            }
             LOG_INF("Disconnected or Emergency...");
             (void)m_fl->setAngRef(0 * rad / s);
             (void)m_fr->setAngRef(0 * rad / s);
@@ -65,16 +101,50 @@ void OneChassisNode::run()
             k_sleep(K_MSEC(500));
             continue;
         }
+        if (!m_normal_status_toggled)
+        {
+            NotifyHub::setLEDStatus("chassis", {c_normal, LEDMode::Breathing, 1, 300});
+            m_normal_status_toggled = true;
+            m_warning_status_toggled = false;
+        }
         auto data = state.value();
         // const auto swR = data[SW_R];
-        const auto leftY = data.percent(LEFT_Y); // 前后
-        const auto leftX = data.percent(LEFT_X); // 左右
-        const auto rightX = data.percent(RIGHT_X); // 旋转
+        const auto vx_local = data.percent(LEFT_Y); // 前后
+        const auto vy_local = -data.percent(LEFT_X); // 左右
+        float vw_command = data.percent(RIGHT_X); // 旋转
+
+        const auto imu_data = getImuData();
+        const float current_yaw = -imu_data.euler_angle.yaw;
+        if (!m_is_yaw_initialized)
+        {
+            m_target_yaw = current_yaw;
+            m_is_yaw_initialized = true;
+        }
+
+        if (constexpr float ROTATION_DEADZONE = 0.05f; std::abs(vw_command) > ROTATION_DEADZONE)
+        {
+            // 手动旋转
+            // 直接使用摇杆值作为速度
+            m_target_yaw = current_yaw;
+        }
+        else
+        {
+            // 航向锁定
+            // 右摇杆归中，用 PID 计算修正量
+
+            float yaw_error = m_target_yaw - current_yaw;
+
+            // 过零点处理
+
+            while (yaw_error > std::numbers::pi_v<float>) yaw_error -= 2 * std::numbers::pi_v<float>;
+            while (yaw_error < -std::numbers::pi_v<float>) yaw_error += 2 * std::numbers::pi_v<float>;
+            vw_command = m_yaw_pid.compute(yaw_error, 0);
+        }
 
         auto [fl_v, fr_v, bl_v, br_v] = g_solver.inverse({
-            leftY * 2.5f * m / s,
-            -leftX * 2.5f * m / s,
-            -rightX * 2.0f * rad / s,
+            vx_local * 3.5f * m / s,
+            vy_local * 3.5f * m / s,
+            -vw_command * 2.0f * rad / s,
         });
         topic_one_chassis.write({
             fl_v.numerical_value_in(rad / s), fr_v.numerical_value_in(rad / s), bl_v.numerical_value_in(rad / s),

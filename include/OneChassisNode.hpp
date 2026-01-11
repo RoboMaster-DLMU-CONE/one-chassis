@@ -19,6 +19,7 @@ using namespace OF;
 
 using one::pid::PidParams;
 using one::pid::PidConfig;
+using one::pid::PidController;
 using one::pid::PidChain;
 using OneMotor::Motor::DJI::M3508;
 using OneMotor::Motor::DJI::makeM3508;
@@ -82,6 +83,10 @@ private:
     std::unique_ptr<M3508<1, decltype(g_chain)>> m_fr;
     std::unique_ptr<M3508<3, decltype(g_chain)>> m_bl;
     std::unique_ptr<M3508<4, decltype(g_chain)>> m_br;
+    float m_target_yaw = 0.0f; // 期望的目标角度
+    bool m_is_yaw_initialized = false; // 初始化标志
+    bool m_normal_status_toggled = false;
+    bool m_warning_status_toggled = false;
 };
 
 

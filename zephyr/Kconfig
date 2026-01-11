@@ -2,8 +2,9 @@ config ONE_CHASSIS
     bool "one-chassis node for OneFramework"
     depends on ONE_FRAMEWORK
     select ONE_MOTOR
-    select INPUT_DBUS
     select CONTROLLER_HUB
+    select IMU_HUB
+    select NOTIFY_HUB
     help
       Enable one-chassis node.
 
