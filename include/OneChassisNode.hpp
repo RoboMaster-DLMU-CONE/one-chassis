@@ -56,7 +56,7 @@ class OneChassisNode : public Node<OneChassisNode>
 public:
     struct Meta
     {
-        static constexpr size_t stack_size = 8192;
+        static constexpr size_t stack_size = 4096;
         static constexpr int priority = 1;
         static constexpr auto name = "one_chassis";
     };
