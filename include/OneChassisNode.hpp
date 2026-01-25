@@ -22,23 +22,22 @@ using one::pid::PidConfig;
 using one::pid::PidController;
 using one::pid::PidChain;
 using OneMotor::Motor::DJI::M3508;
-using OneMotor::Motor::DJI::makeM3508;
 using OneMotor::Can::CanDriver;
 using OneMotor::Motor::DJI::PIDFeatures;
 
 
 using enum ControllerHub::Channel;
 
-static constexpr PidParams<> ANG_DEFAULT_PARAMS{
-    .Kp = 0.4,
-    .Ki = 0.01,
-    .Kd = 0.01,
-    .MaxOutput = 13000,
+static constexpr PidParams<> g_j6_ang_params{
+    .Kp = 0.6,
+    .Ki = 0.001,
+    .Kd = 0.11,
+    .MaxOutput = 14000,
     .Deadband = 100,
-    .IntegralLimit = 2000,
+    .IntegralLimit = 1000,
 };
 
-static constexpr PidConfig<one::pid::Positional, float, PIDFeatures> g_pid_conf = {ANG_DEFAULT_PARAMS};
+static constexpr PidConfig<one::pid::Positional, float, PIDFeatures> g_pid_conf = {g_j6_ang_params};
 
 static PidChain g_chain(g_pid_conf);
 
