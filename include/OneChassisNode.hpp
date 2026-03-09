@@ -3,7 +3,7 @@
 #include <memory>
 #include <OF/lib/Node/Node.hpp>
 
-#include "OneMotor/Can/CanDriver.hpp"
+#include <one/can/CanDriver.hpp>
 
 #include <one/PID/PidParams.hpp>
 #include <one/PID/PidConfig.hpp>
@@ -11,7 +11,7 @@
 
 #include <OF/lib/algo/Mecanum.hpp>
 
-#include <OneMotor/Motor/DJI/DjiMotor.hpp>
+#include <one/motor/dji/DjiMotor.hpp>
 
 #include "OF/lib/ControllerHub/ControllerHub.hpp"
 
@@ -21,14 +21,13 @@ using one::pid::PidParams;
 using one::pid::PidConfig;
 using one::pid::PidController;
 using one::pid::PidChain;
-using OneMotor::Motor::DJI::M3508;
-using OneMotor::Can::CanDriver;
-using OneMotor::Motor::DJI::PIDFeatures;
+using one::motor::dji::M3508;
+using one::can::CanDriver;
 
 
 using enum ControllerHub::Channel;
 
-static constexpr PidParams<> g_j6_ang_params{
+static constexpr PidParams<> g_ang_params{
     .Kp = 0.6,
     .Ki = 0.001,
     .Kd = 0.11,
@@ -36,10 +35,6 @@ static constexpr PidParams<> g_j6_ang_params{
     .Deadband = 100,
     .IntegralLimit = 1000,
 };
-
-static constexpr PidConfig<one::pid::Positional, float, PIDFeatures> g_pid_conf = {g_j6_ang_params};
-
-static PidChain g_chain(g_pid_conf);
 
 using namespace Units::literals;
 static constexpr Algo::Mecanum::Config g_m_conf{
@@ -77,11 +72,12 @@ public:
     }
 
 private:
-    std::unique_ptr<CanDriver> m_driver;
-    std::unique_ptr<M3508<2, decltype(g_chain)>> m_fl;
-    std::unique_ptr<M3508<1, decltype(g_chain)>> m_fr;
-    std::unique_ptr<M3508<3, decltype(g_chain)>> m_bl;
-    std::unique_ptr<M3508<4, decltype(g_chain)>> m_br;
+    CanDriver m_driver;
+    // 2, 1, 3, 4
+    M3508 m_fl;
+    M3508 m_fr;
+    M3508 m_bl;
+    M3508 m_br;
     float m_target_yaw = 0.0f; // 期望的目标角度
     bool m_is_yaw_initialized = false; // 初始化标志
     bool m_normal_status_toggled = false;

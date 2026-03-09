@@ -55,23 +55,25 @@ static constexpr PidParams<> YAW_DEFAULT_PARAMS{
 
 static PidController m_yaw_pid(YAW_DEFAULT_PARAMS);
 
+using one::motor::dji::AngMode;
+
 bool OneChassisNode::init()
 {
     LOG_INF("init chassis");
     if (config.can_dev == nullptr) return false;
-    m_driver = std::make_unique<CanDriver>(config.can_dev);
-    m_fl = std::make_unique<M3508<2, decltype(g_chain)>>(*m_driver, g_chain);
-    m_fr = std::make_unique<M3508<1, decltype(g_chain)>>(*m_driver, g_chain);
-    m_bl = std::make_unique<M3508<3, decltype(g_chain)>>(*m_driver, g_chain);
-    m_br = std::make_unique<M3508<4, decltype(g_chain)>>(*m_driver, g_chain);
-    (void)m_fl->setAngRef(0 * rad / s);
-    (void)m_fr->setAngRef(0 * rad / s);
-    (void)m_bl->setAngRef(0 * rad / s);
-    (void)m_br->setAngRef(0 * rad / s);
-    (void)m_fl->enable();
-    (void)m_fr->enable();
-    (void)m_bl->enable();
-    (void)m_br->enable();
+    (void)m_driver.init(config.can_dev);
+    (void)m_fl.init(m_driver, one::motor::dji::Param{2, AngMode{g_ang_params}});
+    (void)m_fr.init(m_driver, one::motor::dji::Param{1, AngMode{g_ang_params}});
+    (void)m_bl.init(m_driver, one::motor::dji::Param{3, AngMode{g_ang_params}});
+    (void)m_br.init(m_driver, one::motor::dji::Param{4, AngMode{g_ang_params}});
+    m_fl.setAngRef(0);
+    m_fr.setAngRef(0);
+    m_bl.setAngRef(0);
+    m_br.setAngRef(0);
+    (void)m_fl.enable();
+    (void)m_fr.enable();
+    (void)m_bl.enable();
+    (void)m_br.enable();
     m_is_yaw_initialized = false;
     return true;
 }
@@ -94,10 +96,10 @@ void OneChassisNode::run()
                 m_normal_status_toggled = false;
             }
             LOG_INF("Disconnected or Emergency...");
-            (void)m_fl->setAngRef(0 * rad / s);
-            (void)m_fr->setAngRef(0 * rad / s);
-            (void)m_bl->setAngRef(0 * rad / s);
-            (void)m_br->setAngRef(0 * rad / s);
+            m_fl.setAngRef(0);
+            m_fr.setAngRef(0);
+            m_bl.setAngRef(0);
+            m_br.setAngRef(0);
             k_sleep(K_MSEC(500));
             continue;
         }
@@ -151,10 +153,10 @@ void OneChassisNode::run()
             br_v.numerical_value_in(rad / s)
         });
 
-        (void)m_fl->setAngRef(fl_v);
-        (void)m_fr->setAngRef(-fr_v);
-        (void)m_bl->setAngRef(bl_v);
-        (void)m_br->setAngRef(-br_v);
+        m_fl.setAngUnitRef(fl_v);
+        m_fr.setAngUnitRef(-fr_v);
+        m_bl.setAngUnitRef(bl_v);
+        m_br.setAngUnitRef(-br_v);
     }
 }
 
