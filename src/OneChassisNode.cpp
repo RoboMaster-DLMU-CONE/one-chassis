@@ -1,16 +1,16 @@
 #include <OneChassisData.hpp>
 #include <OneChassisNode.hpp>
 
-
-#include <OF/lib/HubManager/HubManager.hpp>
 #include <OF/lib/ImuHub/ImuHub.hpp>
 #include <OF/lib/NotifyHub/Notify.hpp>
+#include <OF/lib/VtHub/VtHub.hpp>
 
 #include <numbers>
 
 #include <ems_parser.hpp>
 
 #include "OF/lib/NotifyHub/NotifyHub.hpp"
+#include "RPL/Packets/VT03RemotePacket.hpp"
 
 /* TODO:
  *   1. 目前的电机基类不够优雅，CRTP导致必须要有模板参数，基本无法创建一个通用的类。
@@ -86,8 +86,8 @@ void OneChassisNode::run()
     while (true)
     {
         k_sleep(K_MSEC(10));
-        auto state = getControllerData();
-        if (!state || state.value()[SW_L] == 1)
+        auto state = VtHub::get<VT03RemotePacket>();
+        if (!state || state.value().switch_state == 1)
         {
             if (!m_warning_status_toggled)
             {
@@ -111,9 +111,10 @@ void OneChassisNode::run()
         }
         auto data = state.value();
         // const auto swR = data[SW_R];
-        const auto vx_local = data.percent(LEFT_Y); // 前后
-        const auto vy_local = -data.percent(LEFT_X); // 左右
-        float vw_command = data.percent(RIGHT_X); // 旋转
+        const auto vx_local = vt_stick_percent(data.left_stick_y); // 前后
+        const auto vy_local = -vt_stick_percent(data.left_stick_x); // 左右
+        float vw_command = vt_stick_percent(data.right_stick_x);
+        // 旋转
 
         const auto imu_data = getImuData();
         const float current_yaw = -imu_data.euler_angle.yaw;

@@ -12,8 +12,7 @@
 #include <OF/lib/algo/Mecanum.hpp>
 
 #include <one/motor/dji/DjiMotor.hpp>
-
-#include "OF/lib/ControllerHub/ControllerHub.hpp"
+#include <OF/lib/VtHub/VtHub.hpp>
 
 using namespace OF;
 
@@ -24,8 +23,6 @@ using one::pid::PidChain;
 using one::motor::dji::M3508;
 using one::can::CanDriver;
 
-
-using enum ControllerHub::Channel;
 
 static constexpr PidParams<> g_ang_params{
     .Kp = 0.6,
