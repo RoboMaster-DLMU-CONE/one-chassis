@@ -9,7 +9,6 @@
 
 #include <ems_parser.hpp>
 
-#include "OF/lib/NotifyHub/NotifyHub.hpp"
 #include "RPL/Packets/VT03RemotePacket.hpp"
 
 /* TODO:
@@ -89,12 +88,7 @@ void OneChassisNode::run()
         auto state = VtHub::get<VT03RemotePacket>();
         if (!state || state.value().switch_state == 1)
         {
-            if (!m_warning_status_toggled)
-            {
-                NotifyHub::setLEDStatus("chassis", {c_warning, LEDMode::Breathing, 1, 300});
-                m_warning_status_toggled = true;
-                m_normal_status_toggled = false;
-            }
+            m_led_guard.set({c_warning, LEDMode::Breathing, 1, 300});
             LOG_INF("Disconnected or Emergency...");
             m_fl.setAngRef(0);
             m_fr.setAngRef(0);
@@ -103,12 +97,7 @@ void OneChassisNode::run()
             k_sleep(K_MSEC(500));
             continue;
         }
-        if (!m_normal_status_toggled)
-        {
-            NotifyHub::setLEDStatus("chassis", {c_normal, LEDMode::Breathing, 1, 300});
-            m_normal_status_toggled = true;
-            m_warning_status_toggled = false;
-        }
+        m_led_guard.set({c_normal, LEDMode::Breathing, 1, 300});
         auto data = state.value();
         // const auto swR = data[SW_R];
         const auto vx_local = vt_stick_percent(data.left_stick_y); // 前后

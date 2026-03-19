@@ -13,6 +13,7 @@
 
 #include <one/motor/dji/DjiMotor.hpp>
 #include <OF/lib/VtHub/VtHub.hpp>
+#include <OF/lib/NotifyHub/NotifyGuard.hpp>
 
 using namespace OF;
 
@@ -77,8 +78,7 @@ private:
     M3508 m_br;
     float m_target_yaw = 0.0f; // 期望的目标角度
     bool m_is_yaw_initialized = false; // 初始化标志
-    bool m_normal_status_toggled = false;
-    bool m_warning_status_toggled = false;
+    NotifyGuard<LEDStatus> m_led_guard{"chassis"};
 };
 
 
