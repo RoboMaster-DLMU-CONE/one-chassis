@@ -26,12 +26,12 @@ using one::can::CanDriver;
 
 
 static constexpr PidParams<> g_ang_params{
-    .Kp = 0.6,
-    .Ki = 0.001,
-    .Kd = 0.11,
-    .MaxOutput = 14000,
-    .Deadband = 100,
-    .IntegralLimit = 1000,
+    .Kp = 200,
+    .Ki = 0.1,
+    .Kd = 0.0,
+    .MaxOutput = 12000,
+    .Deadband = 0,
+    .IntegralLimit = 2000,
 };
 
 using namespace Units::literals;
@@ -49,7 +49,7 @@ public:
     struct Meta
     {
         static constexpr size_t stack_size = 4096;
-        static constexpr int priority = 1;
+        static constexpr int priority = 5;
         static constexpr auto name = "one_chassis";
     };
 
@@ -71,7 +71,7 @@ public:
 
 private:
     CanDriver m_driver;
-    // 2, 1, 3, 4
+    // 4, 3, 1, 2
     M3508 m_fl;
     M3508 m_fr;
     M3508 m_bl;
@@ -79,6 +79,7 @@ private:
     float m_target_yaw = 0.0f; // 期望的目标角度
     bool m_is_yaw_initialized = false; // 初始化标志
     NotifyGuard<LEDStatus> m_led_guard{"chassis"};
+    // NotifyGuard<BuzzerStatus> m_buzzer_guard{"chassis_buzzer"};
 };
 
 

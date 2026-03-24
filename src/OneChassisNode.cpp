@@ -46,6 +46,16 @@ constexpr auto melody =
         7,,,0
 )"_ems;
 
+// constexpr auto disconnect_melody =
+//     R"((200)
+//         2s`,2s`,
+// )"_ems;
+//
+// constexpr auto connect_melody =
+//     R"((180)
+//         3`.3`.3`.
+// )"_ems;
+
 static constexpr PidParams<> YAW_DEFAULT_PARAMS{
     .Kp = 3,
     .Ki = 0,
@@ -61,10 +71,10 @@ bool OneChassisNode::init()
     LOG_INF("init chassis");
     if (config.can_dev == nullptr) return false;
     (void)m_driver.init(config.can_dev);
-    (void)m_fl.init(m_driver, one::motor::dji::Param{2, AngMode{g_ang_params}});
-    (void)m_fr.init(m_driver, one::motor::dji::Param{1, AngMode{g_ang_params}});
-    (void)m_bl.init(m_driver, one::motor::dji::Param{3, AngMode{g_ang_params}});
-    (void)m_br.init(m_driver, one::motor::dji::Param{4, AngMode{g_ang_params}});
+    (void)m_fl.init(m_driver, one::motor::dji::Param{4, AngMode{g_ang_params}});
+    (void)m_fr.init(m_driver, one::motor::dji::Param{3, AngMode{g_ang_params}});
+    (void)m_bl.init(m_driver, one::motor::dji::Param{1, AngMode{g_ang_params}});
+    (void)m_br.init(m_driver, one::motor::dji::Param{2, AngMode{g_ang_params}});
     m_fl.setAngRef(0);
     m_fr.setAngRef(0);
     m_bl.setAngRef(0);
@@ -86,9 +96,10 @@ void OneChassisNode::run()
     {
         k_sleep(K_MSEC(10));
         auto state = VtHub::get<VT03RemotePacket>();
-        if (!state || state.value().switch_state == 1)
+        if (!state || state.value().switch_state != 0)
         {
-            m_led_guard.set({c_warning, LEDMode::Breathing, 1, 300});
+            // m_led_guard.set({c_warning, LEDMode::Breathing, 1, 300});
+            // m_buzzer_guard.set({disconnect_melody, 50, true});
             LOG_INF("Disconnected or Emergency...");
             m_fl.setAngRef(0);
             m_fr.setAngRef(0);
@@ -97,16 +108,17 @@ void OneChassisNode::run()
             k_sleep(K_MSEC(500));
             continue;
         }
-        m_led_guard.set({c_normal, LEDMode::Breathing, 1, 300});
+        // m_buzzer_guard.set({connect_melody, 50, true});
+        // m_led_guard.set({c_normal, LEDMode::Breathing, 1, 300});
         auto data = state.value();
         // const auto swR = data[SW_R];
-        const auto vx_local = vt_stick_percent(data.left_stick_y); // 前后
-        const auto vy_local = -vt_stick_percent(data.left_stick_x); // 左右
-        float vw_command = vt_stick_percent(data.right_stick_x);
+        const auto vx_local = -vt_stick_percent(data.left_stick_y); // 前后
+        const auto vy_local = vt_stick_percent(data.left_stick_x); // 左右
+        float vw_command = -vt_stick_percent(data.right_stick_x);
         // 旋转
 
         const auto imu_data = getImuData();
-        const float current_yaw = -imu_data.euler_angle.yaw;
+        const float current_yaw = imu_data.euler_angle.yaw;
         if (!m_is_yaw_initialized)
         {
             m_target_yaw = current_yaw;
@@ -125,7 +137,6 @@ void OneChassisNode::run()
             // 右摇杆归中，用 PID 计算修正量
 
             float yaw_error = m_target_yaw - current_yaw;
-
             // 过零点处理
 
             while (yaw_error > std::numbers::pi_v<float>) yaw_error -= 2 * std::numbers::pi_v<float>;
@@ -138,15 +149,11 @@ void OneChassisNode::run()
             vy_local * 3.0f * m / s,
             -vw_command * 3.0f * rad / s,
         });
-        topic_one_chassis.write({
-            fl_v.numerical_value_in(rad / s), fr_v.numerical_value_in(rad / s), bl_v.numerical_value_in(rad / s),
-            br_v.numerical_value_in(rad / s)
-        });
 
-        m_fl.setAngUnitRef(fl_v);
-        m_fr.setAngUnitRef(-fr_v);
-        m_bl.setAngUnitRef(bl_v);
-        m_br.setAngUnitRef(-br_v);
+        m_fl.setAngUnitRef(-fl_v);
+        m_fr.setAngUnitRef(fr_v);
+        m_bl.setAngUnitRef(-bl_v);
+        m_br.setAngUnitRef(br_v);
     }
 }
 
