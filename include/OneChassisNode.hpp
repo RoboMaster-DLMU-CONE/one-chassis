@@ -29,7 +29,7 @@ static constexpr PidParams<> g_ang_params{
     .Kp = 200,
     .Ki = 0.1,
     .Kd = 0.0,
-    .MaxOutput = 12000,
+    .MaxOutput = 10000,
     .Deadband = 0,
     .IntegralLimit = 2000,
 };

@@ -96,7 +96,7 @@ void OneChassisNode::run()
     {
         k_sleep(K_MSEC(10));
         auto state = VtHub::get<VT03RemotePacket>();
-        if (!state || state.value().switch_state != 0)
+        if (!state || state.value().switch_state() != 0)
         {
             // m_led_guard.set({c_warning, LEDMode::Breathing, 1, 300});
             // m_buzzer_guard.set({disconnect_melody, 50, true});
@@ -112,9 +112,9 @@ void OneChassisNode::run()
         // m_led_guard.set({c_normal, LEDMode::Breathing, 1, 300});
         auto data = state.value();
         // const auto swR = data[SW_R];
-        const auto vx_local = -vt_stick_percent(data.left_stick_y); // 前后
-        const auto vy_local = vt_stick_percent(data.left_stick_x); // 左右
-        float vw_command = -vt_stick_percent(data.right_stick_x);
+        const auto vx_local = -vt_stick_percent(data.left_stick_y()); // 前后
+        const auto vy_local = vt_stick_percent(data.left_stick_x()); // 左右
+        float vw_command = -vt_stick_percent(data.right_stick_x());
         // 旋转
 
         const auto imu_data = getImuData();
@@ -145,9 +145,9 @@ void OneChassisNode::run()
         }
 
         auto [fl_v, fr_v, bl_v, br_v] = g_solver.inverse({
-            vx_local * 3.0f * m / s,
-            vy_local * 3.0f * m / s,
-            -vw_command * 3.0f * rad / s,
+            vx_local * 2.2f * m / s,
+            vy_local * 2.2f * m / s,
+            -vw_command * 2.2f * rad / s,
         });
 
         m_fl.setAngUnitRef(-fl_v);
